@@ -16,6 +16,9 @@ import android.widget.Toast;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.tasks.OnSuccessListener;
 
@@ -28,6 +31,8 @@ public class MainActivity extends AppCompatActivity implements
 
     private GoogleApiClient googleApiClient;
     private FusedLocationProviderClient fusedLocationClient;
+    private LocationRequest locationRequest;
+    private LocationCallback locationCallback;
 
     private final static String[] PERMISSIONS = {
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -49,6 +54,21 @@ public class MainActivity extends AppCompatActivity implements
                 .build();
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        locationRequest = new LocationRequest();
+        locationRequest.setInterval(10000);
+        locationRequest.setFastestInterval(5000);
+        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(LocationResult locationResult) {
+                if (locationResult != null) {
+                    Location location = locationResult.getLastLocation();
+                    latLongView.setText(getString(R.string.latlong_format,
+                            location.getLatitude(), location.getLongitude()));
+                }
+            }
+        };
     }
 
     @Override
@@ -59,17 +79,23 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume");
+        startLocationUpdate(true);
+
+    }
+
+    @Override
     protected void onStop() {
         super.onStop();
         Log.d(TAG, "onStop");
         googleApiClient.disconnect();
     }
 
-
     @Override
     public void onConnected(@Nullable Bundle bundle) {
         Log.d(TAG, "onConnected");
-        showLastLocation(true);
     }
 
     @Override
@@ -82,7 +108,7 @@ public class MainActivity extends AppCompatActivity implements
         Log.d(TAG, "onConnectionFailed");
     }
 
-    private void showLastLocation(boolean reqPermission) {
+    private void startLocationUpdate(boolean reqPermission) {
         for (String permission : PERMISSIONS) {
             if (ContextCompat.checkSelfPermission(this, permission) !=
                     PackageManager.PERMISSION_GRANTED) {
@@ -93,14 +119,7 @@ public class MainActivity extends AppCompatActivity implements
                 return;
             }
         }
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        latLongView.setText(getString(R.string.latlong_format,
-                                location.getLatitude(), location.getLongitude()));
-                    }
-                });
+        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
     }
 
     @Override
@@ -109,7 +128,7 @@ public class MainActivity extends AppCompatActivity implements
         Log.d(TAG, "onRequestPermissionsResult");
         switch (reqCode) {
         case REQCODE_PERMISSIONS:
-            showLastLocation(false);
+            startLocationUpdate(false);
             break;
         }
     }
